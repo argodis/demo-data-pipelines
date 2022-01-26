@@ -1,8 +1,17 @@
+import sys
+
+sys.path.insert(0, "/dbfs/Users/david@argodis.de/github/demo/")
+
 from ray import workflow
 from typing import List
 
+from ray_rate_limit_actor import LeakyBucketActor
+
+
+sys.stdout.fileno = lambda: 0
 
 WORKFLOW_STORAGE = "/dbfs/mnt/data/alpaca/workflows"
+
 
 @workflow.step
 def read_data(num: int):
