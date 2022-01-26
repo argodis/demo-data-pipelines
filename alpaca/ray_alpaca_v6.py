@@ -24,10 +24,10 @@ except NameError:
 
 if DB_CLUSTER_ID:
     WORKFLOW_STORAGE = "/dbfs/mnt/data/alpaca/workflows"
-    STORAGE_DIR = Path('/dbfs/mnt/data/alpaca')
+    STORAGE_DIR = Path("/dbfs/mnt/data/alpaca")
 else:
     WORKFLOW_STORAGE = "/tmp/alpaca"
-    STORAGE_DIR = Path('/tmp/data/alpaca')
+    STORAGE_DIR = Path("/tmp/data/alpaca")
 
 STORAGE_DIR.mkdir(exist_ok=True, parents=True)
 
@@ -81,9 +81,9 @@ class StepPayload:
     batch_id: int = 0
 
     def to_filename(self) -> str:
-        p = STORAGE_DIR / f'{self.kind.name.lower()}/{self.start}/{self.asset}/'
+        p = STORAGE_DIR / f"{self.kind.name.lower()}/{self.start}/{self.asset}/"
         p.mkdir(parents=True, exist_ok=True)
-        return str(p / f'{self.batch_id:0>5}.{self.format}')
+        return str(p / f"{self.batch_id:0>5}.{self.format}")
 
 
 class CustomREST(REST):
@@ -101,13 +101,13 @@ class CustomREST(REST):
             # retry if we hit Rate Limit
             if resp.status_code in retry_codes and retry > 0:
                 raise RetryException()
-            if 'code' in resp.text:
+            if "code" in resp.text:
                 error = resp.json()
-                if 'code' in error:
+                if "code" in error:
                     raise APIError(error, http_error)
             else:
                 raise
-        if resp.text != '':
+        if resp.text != "":
             return resp.json()
         return None
 
@@ -132,54 +132,51 @@ def extract(actor: ActorHandle, api, payload: StepPayload) -> None:
         elif kind == Kind.TRADES:
             df = api.get_trades(asset, day, day).df
         elif kind == Kind.BARS:
-            df = api.get_bars(asset, TimeFrame.Minute, pd.Timestamp('now').date(),
-                pd.Timestamp('now').date(), limit=1, adjustment='raw').df
+            df = api.get_bars(
+                asset,
+                TimeFrame.Minute,
+                pd.Timestamp("now").date(),
+                pd.Timestamp("now").date(),
+                limit=1,
+                adjustment="raw",
+            ).df
         else:
-            pass # raise errror
+            pass  # raise errror
 
     duration = time.time() - start
     actor.add.remote(day, asset, duration)
 
     df.to_parquet(file_name, version=ALPACA_PARQUET_VERSION)
-   
- 
+
+
 @workflow.step
 def alpaca(args, key_id, secret_key, telemetry_actor):
 
     # maybe argparse can to that already
-    kinds = list(compress(
-        [Kind.QUOTES, Kind.TRADES, Kind.BARS],
-        [args.quotes, args.trades, args.bars]
-    ))
+    kinds = list(
+        compress(
+            [Kind.QUOTES, Kind.TRADES, Kind.BARS], [args.quotes, args.trades, args.bars]
+        )
+    )
 
     if not kinds:
         kinds = [Kind.QUOTES]
 
     paper_url = "https://paper-api.alpaca.markets"
-    paper_api = REST(
-        key_id=key_id,
-        secret_key=secret_key,
-        base_url=URL(paper_url))
+    paper_api = REST(key_id=key_id, secret_key=secret_key, base_url=URL(paper_url))
 
     if not (symbols := args.symbols):
-        symbols = [el.symbol for el in paper_api.list_assets(status='active')]
+        symbols = [el.symbol for el in paper_api.list_assets(status="active")]
         random.shuffle(symbols)
-        symbols = symbols[:200] # 100 9 GB,
+        symbols = symbols[:200]  # 100 9 GB,
 
     print(kinds, symbols)
 
-    calendars = paper_api.get_calendar(
-        start=args.start_date,
-        end=args.end_date
-    )
+    calendars = paper_api.get_calendar(start=args.start_date, end=args.end_date)
 
     actor = LeakyBucketActor.remote()
 
-    api = CustomREST(
-        actor=actor,
-        key_id=key_id,
-        secret_key=secret_key
-    )
+    api = CustomREST(actor=actor, key_id=key_id, secret_key=secret_key)
 
     def group_elements(lst, chunk_size):
         lst = iter(lst)
@@ -192,12 +189,11 @@ def alpaca(args, key_id, secret_key, telemetry_actor):
             for kind in kinds:
                 payload = StepPayload(asset, kind, day, day)
                 workflow_parameters.append(payload)
-    
+
     for parameter_chunk in group_elements(workflow_parameters, 100):
         promise = []
         for payload in parameter_chunk:
-            promise.append(
-                extract.step(telemetry_actor, api, payload).run_async())
+            promise.append(extract.step(telemetry_actor, api, payload).run_async())
 
         ready, not_ready = ray.wait(promise)
         ray.get(not_ready)
@@ -208,11 +204,10 @@ def alpaca(args, key_id, secret_key, telemetry_actor):
         for obj_ref in parameter_chunk:
             del obj_ref
 
+
 def run(args, key_id, secret_key):
-    #ray.init(ignore_reinit_error=True, address='auto', _redis_password='d4t4bricks')
-    workflow.init(
-        storage=WORKFLOW_STORAGE
-    )
+    # ray.init(ignore_reinit_error=True, address='auto', _redis_password='d4t4bricks')
+    workflow.init(storage=WORKFLOW_STORAGE)
 
     telemetry_actor = TelemetryActor.remote()
 
@@ -229,37 +224,36 @@ def run(args, key_id, secret_key):
     df.to_parquet(file_name, version=ALPACA_PARQUET_VERSION)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Alpaca ray downloader with a rate limit.')
-
-    # Symbols
-    parser.add_argument("--symbols", type=str,
-                    help="Symbols to download data for")
-
-    # Assets
-    parser.add_argument('--quotes', action="store_true",
-                    help='Download quotes')
-    parser.add_argument('--trades', action='store_true',
-                    help='Download trades')
-    parser.add_argument('--bars', action='store_true',
-                    help='Download bars')
-
-    # Dates
-    parser.add_argument('--yesterday', action='store_true',
-                    help='Download bars')
-
-    parser.add_argument('--start-date', type=str, dest="start_date",
-                    help="Begin to download from this date on"
+    parser = argparse.ArgumentParser(
+        description="Alpaca ray downloader with a rate limit."
     )
 
-    parser.add_argument('--stop-date', type=str, dest="end_date",
-                    help="Stop download from this date on"
+    # Symbols
+    parser.add_argument("--symbols", type=str, help="Symbols to download data for")
+
+    # Assets
+    parser.add_argument("--quotes", action="store_true", help="Download quotes")
+    parser.add_argument("--trades", action="store_true", help="Download trades")
+    parser.add_argument("--bars", action="store_true", help="Download bars")
+
+    # Dates
+    parser.add_argument("--yesterday", action="store_true", help="Download bars")
+
+    parser.add_argument(
+        "--start-date",
+        type=str,
+        dest="start_date",
+        help="Begin to download from this date on",
+    )
+
+    parser.add_argument(
+        "--stop-date", type=str, dest="end_date", help="Stop download from this date on"
     )
 
     # Formats
-    parser.add_argument('--parquet', action='store_true',
-                    help='Save in parquet format')
+    parser.add_argument("--parquet", action="store_true", help="Save in parquet format")
 
     # default to bars
 
@@ -300,13 +294,15 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.ERROR)
 
     if DB_CLUSTER_ID:
-        key_id = dbutils.secrets.get('dbc', 'alpaca-key-id')
-        secret_key = dbutils.secrets.get('dbc', 'alpaca-key-secret')
+        key_id = dbutils.secrets.get("dbc", "alpaca-key-id")
+        secret_key = dbutils.secrets.get("dbc", "alpaca-key-secret")
     else:
         key_id = os.getenv("APCA_API_KEY_ID")
         secret_key = os.getenv("APCA_API_SECRET_KEY")
         if not (key_id and secret_key):
-            print("DB_CLUSTER_ID not set. Set APCA_API_KEY_ID and APCA_API_SECRET_KEY to use local secrets.")
+            print(
+                "DB_CLUSTER_ID not set. Set APCA_API_KEY_ID and APCA_API_SECRET_KEY to use local secrets."
+            )
             sys.exit(1)
 
     # signal.signal(signal.SIGINT, sigint_handler)

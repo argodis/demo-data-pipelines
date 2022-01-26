@@ -17,13 +17,16 @@ WORKFLOW_STORAGE = "/dbfs/mnt/data/alpaca/workflows"
 def read_data(num: int):
     return [i for i in range(num)]
 
+
 @workflow.step
 def preprocessing(data: List[float]) -> List[float]:
-    return [d**2 for d in data]
+    return [d ** 2 for d in data]
+
 
 @workflow.step
 def aggregate(data: List[float]) -> float:
     return sum(data)
+
 
 # Initialize workflow storage.
 workflow.init(storage=WORKFLOW_STORAGE)

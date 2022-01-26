@@ -1,3 +1,5 @@
+# coding: utf-8
+
 import time
 import ray
 
@@ -12,13 +14,16 @@ class LeakyBucketActor:
     capacity: int
     amount: int
 
-    def __init__(self) -> None:
-        self.capacity = 200
-        self.rate = 3 # msgs per second
+    def __init__(self, capacity=200, rate=3) -> None:
+        self.capacity = capacity
+        self.rate = rate  # msgs per second
         self.last_leak = monotonic()
         self.amount = 0
         self._counter = Counter(
-            "num_requests", description="Sample", tag_keys=("actor_name", ))
+            "num_calls",
+            description="Number of call to actor methods",
+            tag_keys=("actor_name",),
+        )
         self._counter.set_default_tags({"actor_name": "LeakyBucketActor"})
 
     async def update(self, name, n) -> None:
