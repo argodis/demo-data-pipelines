@@ -7,6 +7,17 @@
 #
 #
 
+#
+# A ray workflow to download data from the Alpaca REST API.
+#
+# The workflow currently consist of only one workflow step.  This
+# was done to minimise data serialization and reduce I/O operations
+# on the Azure Blob Storage.  As Ray workflows need a shared
+# read-write storage to exchange data between workers.  For a
+# similar reason we also split data writes between cheaper
+# Azure Blob Storage and Azure Data Lake.
+#
+
 import os
 from pickle import NONE
 import sys
@@ -17,6 +28,15 @@ from pathlib import Path
 sys.path.insert(0, "/dbfs/Users/david@argodis.de/github/demo/")
 sys.stdout.fileno = lambda: 0
 
+#
+# Global Settings
+#
+ALPACA_PARQUET_VERSION = "2.0"
+ALPACA_RATE_LIMIT = 3
+ALPACA_OFFSET = 8
+ALPACA_STORAGE_DIR = "datalake/landing/alpaca"
+RAY_WORKFLOW_DIR = ""
+
 try:
     DB_CLUSTER_ID = spark.conf.get("spark.databricks.clusterUsageTags.clusterId")
 except NameError:
@@ -24,15 +44,13 @@ except NameError:
 
 if DB_CLUSTER_ID:
     WORKFLOW_STORAGE = "/dbfs/mnt/data/alpaca/workflows"
-    STORAGE_DIR = Path("/dbfs/mnt/data/alpaca")
+    STORAGE_DIR = Path("/dbfs/mnt/datalake/landing/alpaca")
 else:
-    WORKFLOW_STORAGE = "/tmp/alpaca"
-    STORAGE_DIR = Path("/tmp/data/alpaca")
+    WORKFLOW_STORAGE = "/tmp/data/alpaca/workflows"
+    STORAGE_DIR = Path("/tmp/datalake/landing/alpaca")
 
 STORAGE_DIR.mkdir(exist_ok=True, parents=True)
 
-
-ALPACA_PARQUET_VERSION = "2.0"
 
 import ray
 import datetime
@@ -81,7 +99,7 @@ class StepPayload:
     batch_id: int = 0
 
     def to_filename(self) -> str:
-        p = STORAGE_DIR / f"{self.kind.name.lower()}/{self.start}/{self.asset}/"
+        p = STORAGE_DIR / f"{self.kind.name.lower()}/date={self.start}/symbol={self.asset}/"
         p.mkdir(parents=True, exist_ok=True)
         return str(p / f"{self.batch_id:0>5}.{self.format}")
 
@@ -140,8 +158,6 @@ def extract(actor: ActorHandle, api, payload: StepPayload) -> None:
                 limit=1,
                 adjustment="raw",
             ).df
-        else:
-            pass  # raise errror
 
     duration = time.time() - start
     actor.add.remote(day, asset, duration)
@@ -168,13 +184,15 @@ def alpaca(args, key_id, secret_key, telemetry_actor):
     if not (symbols := args.symbols):
         symbols = [el.symbol for el in paper_api.list_assets(status="active")]
         random.shuffle(symbols)
-        symbols = symbols[:200]  # 100 9 GB,
 
-    print(kinds, symbols)
+    print("Symbols: ", symbols)
 
     calendars = paper_api.get_calendar(start=args.start_date, end=args.end_date)
 
-    actor = LeakyBucketActor.remote()
+    alpaca_rate_limit = 3 if args.limited else 15
+    actor = LeakyBucketActor.remote(rate=alpaca_rate_limit)
+
+    print("Rate limit: ", alpaca_rate_limit)
 
     api = CustomREST(actor=actor, key_id=key_id, secret_key=secret_key)
 
@@ -211,7 +229,12 @@ def run(args, key_id, secret_key):
 
     telemetry_actor = TelemetryActor.remote()
 
+    start = time.time()
+
     alpaca.step(args, key_id, secret_key, telemetry_actor).run()
+
+    stop = time.time() - start
+    print("Total time: ", round(stop/60, 2))
 
     df = ray.get(telemetry_actor.collect.remote())
     file_path = STORAGE_DIR / "telemetry"
@@ -252,6 +275,9 @@ if __name__ == "__main__":
         "--stop-date", type=str, dest="end_date", help="Stop download from this date on"
     )
 
+    # Rate limit
+    parser.add_argument("--limited", action="store_true", help="Use rate limited API key")
+
     # Formats
     parser.add_argument("--parquet", action="store_true", help="Save in parquet format")
 
@@ -266,10 +292,10 @@ if __name__ == "__main__":
         try:
             datetime.datetime.strptime(args.start_date, "%Y-%m-%d")
         except ValueError:
-            print("Can not parse date")
+            print("Can not parse --start-date")
             sys.exit(1)
     else:
-        start_date = datetime.datetime.now() - datetime.timedelta(10)
+        start_date = datetime.datetime.now() - datetime.timedelta(ALPACA_OFFSET)
         args.start_date = start_date.strftime("%Y-%m-%d")
 
     if args.end_date:
@@ -284,7 +310,7 @@ if __name__ == "__main__":
     else:
         if args.start_date:
             start_date = datetime.datetime.strptime(args.start_date, "%Y-%m-%d")
-            end_date = start_date + datetime.timedelta(1)
+            end_date = start_date + datetime.timedelta(2)
             args.end_date = end_date.strftime("%Y-%m-%d")
 
     print(args.end_date, args.start_date)
@@ -294,8 +320,12 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.ERROR)
 
     if DB_CLUSTER_ID:
-        key_id = dbutils.secrets.get("dbc", "alpaca-key-id")
-        secret_key = dbutils.secrets.get("dbc", "alpaca-key-secret")
+        if args.limited:
+            key_id = dbutils.secrets.get("dbc", "alpaca-key-id")
+            secret_key = dbutils.secrets.get("dbc", "alpaca-key-secret")
+        else:
+            key_id = dbutils.secrets.get("dbc", "alpaca-key-id-unlimited")
+            secret_key = dbutils.secrets.get("dbc", "alpaca-key-secret-unlimited")
     else:
         key_id = os.getenv("APCA_API_KEY_ID")
         secret_key = os.getenv("APCA_API_SECRET_KEY")
