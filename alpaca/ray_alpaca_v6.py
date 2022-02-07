@@ -162,7 +162,7 @@ def extract(actor: ActorHandle, api, payload: StepPayload) -> None:
     duration = time.time() - start
     actor.add.remote(day, asset, duration)
 
-    df.to_parquet(file_name, version=ALPACA_PARQUET_VERSION)
+    df.to_parquet(file_name, allow_truncated_timestamps=True, coerce_timestamps="ms", version=ALPACA_PARQUET_VERSION)
 
 
 @workflow.step
