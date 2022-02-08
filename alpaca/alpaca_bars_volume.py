@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import argparse
 import configparser
 import sys
 
@@ -19,7 +20,6 @@ from pyspark.sql import Window
 
 DB_CLUSTER_ID = None
 LOCAL = True
-# CONFIG_FILE = "/Users/davidhoeppner/Work/argodis/git/demo-data-pipelines/alpaca/alpaca.ini"
 CONFIG_FILE = "/dbfs/Users/david@argodis.de/github/demo/alpaca.ini"
 
 
@@ -32,6 +32,7 @@ except NameError:
     from pyspark.sql import SparkSession
 
     spark = SparkSession.builder.appName("Alpaca tick bars").getOrCreate()
+    CONFIG_FILE = "/Users/davidhoeppner/Work/argodis/git/demo-data-pipelines/alpaca/alpaca.ini"
 else:
     DB_CLUSTER_ID = spark.conf.get("spark.databricks.clusterUsageTags.clusterId")
     LOCAL = False
@@ -44,7 +45,23 @@ if __name__ == "__main__":
     environment = "local.trades" if LOCAL else "databricks.trades"
     trades_clean_path = config[environment]["TradesClean"]
     bar_storage_path = config[environment]["BarsVolumePath"]
-    bar_storage_path += "/1000"
+
+    parser = argparse.ArgumentParser(
+        description="Alpaca volume bars."
+    )
+
+    # Downsample size
+    parser.add_argument(
+        "--sample-size",
+        type=int,
+        dest="size",
+        default=700_000,
+        help="Size of the sample"
+    )
+
+    args = parser.parse_args()
+
+    bar_storage_path += f"/{args.size}"
 
 
     df = spark.read.parquet(trades_clean_path)
@@ -59,7 +76,7 @@ if __name__ == "__main__":
 
     df = df.withColumn(
         "x_div",
-        F.expr("x_sum div 700000")
+        F.expr(f"x_sum div {args.size}")
     )
 
     df = df.groupBy(
