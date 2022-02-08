@@ -58,6 +58,7 @@ import argparse
 import random
 import logging
 import time
+import pytz
 
 import pandas as pd
 
@@ -98,10 +99,19 @@ class StepPayload:
     format: str = "parquet"
     batch_id: int = 0
 
-    def to_filename(self) -> str:
-        p = STORAGE_DIR / f"{self.kind.name.lower()}/date={self.start}/symbol={self.asset}/"
-        p.mkdir(parents=True, exist_ok=True)
+    def filename(self) -> str:
+        date_tag = datetime.datetime.fromisoformat(self.start).strftime("%Y-%m-%d")
+        p = STORAGE_DIR / f"{self.kind.name.lower()}/date={date_tag}/symbol={self.asset}/"
         return str(p / f"{self.batch_id:0>5}.{self.format}")
+
+    def mk_directory(self) -> None:
+        """
+        This function has the side effect of creating a directory.  Spark readers
+        seem to be unaware of empty directories.  They will throw an error.
+        """
+        date_tag = datetime.datetime.fromisoformat(self.start).strftime("%Y-%m-%d")
+        p = STORAGE_DIR / f"{self.kind.name.lower()}/date={date_tag}/symbol={self.asset}/"
+        p.mkdir(parents=True, exist_ok=True)
 
 
 class CustomREST(REST):
@@ -132,9 +142,9 @@ class CustomREST(REST):
 
 @workflow.step
 def extract(actor: ActorHandle, api, payload: StepPayload) -> None:
-    file_name = payload.to_filename()
+    file_name = payload.filename()
     asset = payload.asset
-    day = payload.start
+    start_date, end_date = payload.start, payload.end
     kind = payload.kind
 
     start = time.time()
@@ -146,9 +156,9 @@ def extract(actor: ActorHandle, api, payload: StepPayload) -> None:
     else:
         # use switch in 3.10
         if kind == Kind.QUOTES:
-            df = api.get_quotes(asset, day, day).df
+            df = api.get_quotes(asset, start_date, end_date).df
         elif kind == Kind.TRADES:
-            df = api.get_trades(asset, day, day).df
+            df = api.get_trades(asset, start_date, end_date).df
         elif kind == Kind.BARS:
             df = api.get_bars(
                 asset,
@@ -160,9 +170,11 @@ def extract(actor: ActorHandle, api, payload: StepPayload) -> None:
             ).df
 
     duration = time.time() - start
-    actor.add.remote(day, asset, duration)
+    actor.add.remote(start_date, asset, duration)
 
-    df.to_parquet(file_name, allow_truncated_timestamps=True, coerce_timestamps="ms", version=ALPACA_PARQUET_VERSION)
+    if not df.empty:
+        payload.mk_directory()
+        df.to_parquet(file_name, allow_truncated_timestamps=True, coerce_timestamps="ms", version=ALPACA_PARQUET_VERSION)
 
 
 @workflow.step
@@ -202,10 +214,28 @@ def alpaca(args, key_id, secret_key, telemetry_actor):
 
     workflow_parameters = []
     for calendar in calendars:
-        day = calendar.date.strftime("%Y-%m-%d")
+        base_date = calendar.date.to_pydatetime()
+        base_date = datetime.datetime(
+            year=base_date.year,
+            month=base_date.month,
+            day=base_date.day,
+            tzinfo=pytz.timezone("EST")
+        )
+        start_date = base_date + datetime.timedelta(
+            hours=calendar.open.hour,
+            minutes=calendar.open.minute
+        )
+        start_date = start_date.astimezone(pytz.timezone('UTC')).isoformat()
+
+        end_date = base_date + datetime.timedelta(
+            hours=calendar.close.hour,
+            minutes=calendar.close.minute
+        )
+        end_date = end_date.astimezone(pytz.timezone('UTC')).isoformat()
+
         for asset in symbols:
             for kind in kinds:
-                payload = StepPayload(asset, kind, day, day)
+                payload = StepPayload(asset, kind, start_date, end_date)
                 workflow_parameters.append(payload)
 
     for parameter_chunk in group_elements(workflow_parameters, 100):
