@@ -254,8 +254,8 @@ def alpaca(args, key_id, secret_key, telemetry_actor):
 
 
 def run(args, key_id, secret_key):
-    # ray.init(ignore_reinit_error=True, address='auto', _redis_password='d4t4bricks')
-    workflow.init(storage=WORKFLOW_STORAGE)
+    ray.init(ignore_reinit_error=True, address='auto', _redis_password='d4t4bricks', storage=WORKFLOW_STORAGE)
+    workflow.init()
 
     telemetry_actor = TelemetryActor.remote()
 
