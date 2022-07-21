@@ -42,6 +42,11 @@ try:
 except NameError:
     DB_CLUSTER_ID = None
 
+#
+# Since Ray version > 0.11 workflow storage was moved
+# from workflow.init to the ray.init and should also be present in the
+# cluster startup command.
+#
 if DB_CLUSTER_ID:
     WORKFLOW_STORAGE = "/dbfs/mnt/data/alpaca/workflows"
     STORAGE_DIR = Path("/dbfs/mnt/datalake/landing/alpaca")

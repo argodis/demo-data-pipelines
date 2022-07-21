@@ -3,7 +3,7 @@
 #RAY PORT
 RAY_PORT=9339
 REDIS_PASS="d4t4bricks"
-STORAGE_PATH="/dbfs/mnt/data/alpaca/w1"
+STORAGE_PATH="/dbfs/mnt/data/alpaca/workflows"
 
 # install ray
 /databricks/python/bin/pip install ray pyarrow alpaca-trade-api
