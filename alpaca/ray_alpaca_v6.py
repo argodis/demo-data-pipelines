@@ -163,16 +163,25 @@ def extract(actor: ActorHandle, api, payload: StepPayload) -> None:
         if kind == Kind.QUOTES:
             df = api.get_quotes(asset, start_date, end_date).df
         elif kind == Kind.TRADES:
-            df = api.get_trades(asset, start_date, end_date).df
+            try:
+                df = api.get_trades(asset, start_date, end_date).df
+            except:
+                return
+            # Data contains invalid values
+            if not df.empty:
+                df["price"] = df["price"].astype("float")
         elif kind == Kind.BARS:
-            df = api.get_bars(
-                asset,
-                TimeFrame.Minute,
-                pd.Timestamp("now").date(),
-                pd.Timestamp("now").date(),
-                limit=1,
-                adjustment="raw",
-            ).df
+            try:
+                df = api.get_bars(
+                    asset,
+                    TimeFrame.Minute,
+                    start_date,
+                    end_date,
+                    limit=10000,
+                    adjustment="raw",
+                ).df
+            except:
+                return
 
     duration = time.time() - start
     actor.add.remote(start_date, asset, duration)
@@ -297,7 +306,7 @@ if __name__ == "__main__":
     parser.add_argument("--bars", action="store_true", help="Download bars")
 
     # Dates
-    parser.add_argument("--yesterday", action="store_true", help="Download bars")
+    parser.add_argument("--yesterday", action="store_true", help="Start date is yesterday in EST timezone")
 
     parser.add_argument(
         "--start-date",
@@ -330,7 +339,8 @@ if __name__ == "__main__":
             print("Can not parse --start-date")
             sys.exit(1)
     else:
-        start_date = datetime.datetime.now() - datetime.timedelta(ALPACA_OFFSET)
+        offset = 1 if args.yesterday else ALPACA_OFFSET
+        start_date = datetime.datetime.now(pytz.timezone("EST")) - datetime.timedelta(offset)
         args.start_date = start_date.strftime("%Y-%m-%d")
 
     if args.end_date:
@@ -345,10 +355,15 @@ if __name__ == "__main__":
     else:
         if args.start_date:
             start_date = datetime.datetime.strptime(args.start_date, "%Y-%m-%d")
-            end_date = start_date + datetime.timedelta(2)
+            end_date = start_date + datetime.timedelta(1)
             args.end_date = end_date.strftime("%Y-%m-%d")
+        if args.yesterday:
+            end_date = start_date + datetime.timedelta(1)
 
-    print(args.end_date, args.start_date)
+    print(f"DEBUG: start_date {start_date} end_date {end_date}")
+
+    assert(start_date)
+    assert(end_date)
 
     # argparse trades, date, stock
 
