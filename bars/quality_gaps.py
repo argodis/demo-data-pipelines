@@ -7,6 +7,8 @@ pd.set_option('display.max_rows', None)
 
 df = pd.read_parquet("/tmp/datalake/landing/alpaca/bars/historical-daily-bars/minute")
 
+df = df.between_time("9:30", "17:45")
+
 c_df = df.loc["2022-01-06"]
 print(c_df.head(1000))
 df = df.reset_index()
