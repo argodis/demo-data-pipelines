@@ -31,3 +31,23 @@ jobs:
         run: |
           echo Add other actions to build,
           echo test, and deploy your project.
+  alpaca-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2 
+        with: 
+          python-version: 3.9
+          cache: pip
+
+      - name: Install dependencies 
+        run: | 
+          python -m pip install --upgrade pip 
+          pip install -r requirements.txt
+
+      - name: Linting with pylint
+        run: python bars/quality_gaps.py --storage-path=./data/bars/minute
+
