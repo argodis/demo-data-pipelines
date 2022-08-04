@@ -1,0 +1,6 @@
+
+pandas
+ray
+pyarrow
+alpaca-trade-api
+seaborn
