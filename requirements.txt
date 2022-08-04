@@ -6,3 +6,4 @@ alpaca-trade-api
 seaborn
 pylint
 tqdm
+uniplot
