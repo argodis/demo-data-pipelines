@@ -52,16 +52,20 @@ if __name__ == "__main__":
     df = spark.read.parquet(trades_clean_path)
     df.show()
 
+    df = df.withColumn("timestamp_tz", F.from_utc_timestamp(F.col("timestamp"), "EST"))
+
     df = df.groupBy(
-        F.window(df.timestamp, window_duration, slide_size),
+        F.window(df.timestamp_tz, window_duration, slide_size),
         df.symbol
     ).agg(
-        F.max(df.price).alias("max_price"),
-        F.min(df.price).alias("min_price"),
+        F.max(df.price).alias("high"),
+        F.min(df.price).alias("low"),
         F.count(df.price).alias("count"),
-        F.first(df.price).alias("first_price"),
-        F.last(df.price).alias("last_price")
+        F.first(df.price).alias("open"),
+        F.last(df.price).alias("close")
     ).orderBy('window')
+
+    df_window = df_window.withColumn("timestamp", F.col("window.start"))
 
     df.printSchema()
     df.show()
