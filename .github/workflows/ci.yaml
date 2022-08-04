@@ -48,6 +48,6 @@ jobs:
           python -m pip install --upgrade pip 
           pip install -r requirements.txt
 
-      - name: Linting with pylint
-        run: python bars/quality_gaps.py --storage-path=./data/bars/minute
+      - name: Finding gaps in Alpaca minute bars
+        run: python bars/quality_gaps.py --storage-path=$(pwd)/data/bars/minute
 
