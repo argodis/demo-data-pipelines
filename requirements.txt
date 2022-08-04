@@ -4,3 +4,4 @@ ray
 pyarrow
 alpaca-trade-api
 seaborn
+pylint
