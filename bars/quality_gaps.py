@@ -56,5 +56,9 @@ if __name__ == "__main__":
 
     for i, g in plot_df.groupby(pd.Grouper(freq='24H')):
         if not g.empty:
+            timestamp = g.iloc[0]["timestamp"]
+            date = f"{timestamp.year}-{timestamp.month}-{timestamp.day}"
+            # hours = [t.hour for t in g["timestamp"].tolist()]
             g = g.where(g["seconds"] < 1000).dropna()
-            plot(ys=g["seconds"])
+            print()
+            plot(ys=g["seconds"], title=f"{date}", y_unit=" s", x_unit=" events")
