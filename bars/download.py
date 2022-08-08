@@ -120,8 +120,8 @@ if __name__ == "__main__":
 
 
     if DB_CLUSTER_ID:
-        key_id = dbutils.secrets.get("dbc", "alpaca-key-id-unlimited")
-        secret_key = dbutils.secrets.get("dbc", "alpaca-key-secret-unlimited")
+        key_id = dbutils.secrets.get("dbc", "alpaca-key-id-unlimited") # pylint: disable=E0602
+        secret_key = dbutils.secrets.get("dbc", "alpaca-key-secret-unlimited") # pylint: disable=E0602
     else:
         key_id = os.getenv("APCA_API_KEY_ID")
         secret_key = os.getenv("APCA_API_SECRET_KEY")
