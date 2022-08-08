@@ -29,7 +29,6 @@ except NameError:
     DB_CLUSTER_ID = None
     LOCAL = True
     CONFIG_FILE = "/Users/davidhoeppner/Work/argodis/git/demo-data-pipelines/bars/downloader.ini"
-    
 else:
     LOCAL = False
     CONFIG_FILE = "/dbfs/Users/david@argodis.de/github/demo/downloader.ini"
@@ -97,7 +96,6 @@ if __name__ == "__main__":
     else:
         ALPACA_START = datetime.datetime.now(pytz.timezone("EST")) - datetime.timedelta(1)
 
- 
     if args.end_date:
         if not args.start_date:
             print("End date but no start date")
@@ -176,6 +174,9 @@ if __name__ == "__main__":
             ).df
         except APIError:
             logging.error("Exception %s", symbol)
+            continue
+
+        if df.empty:
             continue
 
         df = df.reset_index()
