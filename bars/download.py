@@ -9,9 +9,8 @@ import datetime
 import os
 import logging
 import sys
-import pytz
-
 from pathlib import Path
+import pytz
 
 from tqdm import tqdm
 
@@ -24,12 +23,22 @@ from alpaca_trade_api.rest import TimeFrameUnit
 from alpaca_trade_api.rest import APIError
 
 
+try:
+    DB_CLUSTER_ID = spark.conf.get("spark.databricks.clusterUsageTags.clusterId")
+except NameError:
+    DB_CLUSTER_ID = None
+    LOCAL = True
+    CONFIG_FILE = "/Users/davidhoeppner/Work/argodis/git/demo-data-pipelines/bars/downloader.ini"
+    
+else:
+    LOCAL = False
+    CONFIG_FILE = "/dbfs/Users/david@argodis.de/github/demo/downloader.ini"
+
+
 ALPACA_INTERVAL = TimeFrame(1, TimeFrameUnit.Day)
 ALPACA_ADJUSTMENT = "raw"
 TODAY = datetime.datetime.now().strftime("%Y-%m-%d")
-CONFIG_FILE = "/Users/davidhoeppner/Work/argodis/git/demo-data-pipelines/bars/downloader.ini"
-#CONFIG_FILE = "/dbfs/Users/david@argodis.de/github/demo/downloader.ini"
-LOCAL = True
+
 
 if __name__ == "__main__":
 
@@ -39,7 +48,9 @@ if __name__ == "__main__":
 
     # Symbols
     parser.add_argument("--symbols", type=str, help="Symbols to download data for")
-    parser.add_argument("--symbols-by-volume", type=int, help="Select which symbols are download by minimum daily volume")
+    parser.add_argument(
+        "--symbols-by-volume",
+        type=int, help="Select which symbols are download by minimum daily volume")
 
     # Time intervals
     parser.add_argument("--minute-bars", action="store_true", help="Download minute bars")
@@ -101,16 +112,21 @@ if __name__ == "__main__":
     else:
         ALPACA_END = ALPACA_START + datetime.timedelta(1)
 
-    assert(ALPACA_START)
-    assert(ALPACA_END)
+    assert ALPACA_START
+    assert ALPACA_END
 
     ALPACA_START = ALPACA_START.strftime("%Y-%m-%d")
     ALPACA_END = ALPACA_END.strftime("%Y-%m-%d")
 
     print(ALPACA_START, ALPACA_END)
 
-    key_id = os.getenv("APCA_API_KEY_ID")
-    secret_key = os.getenv("APCA_API_SECRET_KEY")
+
+    if DB_CLUSTER_ID:
+        key_id = dbutils.secrets.get("dbc", "alpaca-key-id-unlimited")
+        secret_key = dbutils.secrets.get("dbc", "alpaca-key-secret-unlimited")
+    else:
+        key_id = os.getenv("APCA_API_KEY_ID")
+        secret_key = os.getenv("APCA_API_SECRET_KEY")
 
     PAPER_URL = "https://paper-api.alpaca.markets"
     paper_api = REST(key_id=key_id, secret_key=secret_key, base_url=URL(PAPER_URL))
@@ -118,9 +134,9 @@ if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read(CONFIG_FILE)
 
-    environment = "local.downloader" if LOCAL else "databricks.downloader"
-    daily_bars_path = config[environment]["DailyBarsPath"]
-    storage_path = config[environment]["StoragePath"]
+    ENVIRONMENT = "local.downloader" if LOCAL else "databricks.downloader"
+    daily_bars_path = config[ENVIRONMENT]["DailyBarsPath"]
+    storage_path = config[ENVIRONMENT]["StoragePath"]
 
     STORAGE_DIR = Path(storage_path)
 
@@ -130,10 +146,10 @@ if __name__ == "__main__":
         VOLUME = args.symbols_by_volume
         df = pd.read_parquet(daily_bars_path)
         aggregations = {
-            'volume':'min'
+            "v": "min"
         }
         df = df.groupby("symbol").agg(aggregations)
-        df = df[df["volume"] > VOLUME]
+        df = df[df["v"] > VOLUME]
         df = df.reset_index()
         symbols = df["symbol"].tolist()
         print(symbols)
@@ -143,9 +159,8 @@ if __name__ == "__main__":
     api = REST(key_id=key_id, secret_key=secret_key)
 
     for symbol in tqdm(symbols):
-        p = STORAGE_DIR /f"{ALPACA_INTERVAL.amount}{ALPACA_INTERVAL.unit.name[0].lower()}" / f"symbol={symbol}/"
+        p = STORAGE_DIR /f"{ALPACA_INTERVAL.amount}{ALPACA_INTERVAL.unit.name[0].lower()}"
         p.mkdir(parents=True, exist_ok=True)
-        p /= "00001.parquet"
 
         if Path(p).is_file():
             continue
@@ -163,4 +178,7 @@ if __name__ == "__main__":
             logging.error("Exception %s", symbol)
             continue
 
-        df.to_parquet(p)
+        df = df.reset_index()
+        df["date"] = df["timestamp"].dt.date
+        df["symbol"] = symbol
+        df.to_parquet(p, partition_cols=["date", "symbol"])
