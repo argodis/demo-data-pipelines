@@ -1,7 +1,9 @@
 """
-Download bars from Alpaca
-"""
+Download bars from Alpaca.
 
+Should be refactored with the Ray and
+snapshot code.
+"""
 
 import argparse
 import configparser
@@ -89,7 +91,7 @@ if __name__ == "__main__":
         try:
             datetime.datetime.strptime(args.start_date, "%Y-%m-%d")
         except ValueError:
-            print("Can not parse --start-date")
+            logging.error("Can not parse --start-date")
             sys.exit(1)
         else:
             ALPACA_START = datetime.datetime.strptime(args.start_date, "%Y-%m-%d")
@@ -98,12 +100,12 @@ if __name__ == "__main__":
 
     if args.end_date:
         if not args.start_date:
-            print("End date but no start date")
+            logging.error("End date but no start date")
             sys.exit(1)
         try:
             datetime.datetime.strptime(args.end_date, "%Y-%m-%d")
         except ValueError:
-            print("Can not parse date")
+            logging.error("Can not parse date")
             sys.exit(1)
         else:
             ALPACA_END = datetime.datetime.strptime(args.end_date, "%Y-%m-%d")
@@ -116,8 +118,7 @@ if __name__ == "__main__":
     ALPACA_START = ALPACA_START.strftime("%Y-%m-%d")
     ALPACA_END = ALPACA_END.strftime("%Y-%m-%d")
 
-    print(ALPACA_START, ALPACA_END)
-
+    logging.info(ALPACA_START, ALPACA_END)
 
     if DB_CLUSTER_ID:
         key_id = dbutils.secrets.get("dbc", "alpaca-key-id-unlimited") # pylint: disable=E0602
@@ -150,7 +151,7 @@ if __name__ == "__main__":
         df = df[df["v"] > VOLUME]
         df = df.reset_index()
         symbols = df["symbol"].tolist()
-        print(symbols)
+        logging.info(symbols)
     else:
         symbols = [el.symbol for el in paper_api.list_assets(status="active")]
 
