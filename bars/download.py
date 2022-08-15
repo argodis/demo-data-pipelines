@@ -33,14 +33,12 @@ from alpaca_trade_api.rest import APIError
 
 
 try:
-    DB_CLUSTER_ID = spark.conf.get("spark.databricks.clusterUsageTags.clusterId")
+    DB_CLUSTER_ID = spark.conf.get("spark.databricks.clusterUsageTags.clusterId") # pylint: disable=E0602
 except NameError:
     DB_CLUSTER_ID = None
     LOCAL = True
-    CONFIG_FILE = "/Repos/finance/finance/bars/downloader.ini"
 else:
     LOCAL = False
-    CONFIG_FILE = "/Repos/finance/finance/bars/downloader.ini"
 
 
 ALPACA_INTERVAL = TimeFrame(1, TimeFrameUnit.Day)
@@ -104,6 +102,12 @@ if __name__ == "__main__":
         "--storage-path",
         type=str,
         dest="storage_path", help="Under which path data should be stored")
+
+    # Daily bars
+    parser.add_argument(
+        "--daily-bars-path",
+        type=str,
+        dest="daily_bars_path", help="Under which path data should be stored")
 
     args = parser.parse_args()
 
@@ -179,7 +183,7 @@ if __name__ == "__main__":
             sys.exit(1)
         else:
             ALPACA_END = datetime.datetime.strptime(args.end_date, "%Y-%m-%d")
-
+    
     DELTA_TABLE = args.delta_table
 
     assert ALPACA_START
@@ -191,15 +195,16 @@ if __name__ == "__main__":
 
     logging.info(ALPACA_START, ALPACA_END)
 
-    daily_bars_path = "/dbfs/mnt/datalake/landing/alpaca/snapshot/daily-bars"
-
     STORAGE_DIR = Path(args.storage_path)
 
     if args.symbols:
         symbols = args.symbols
     elif args.symbols_by_volume:
+        if not args.daily_bars_path:
+            logging.error("--symbols-by-volume requires --daily_bars_path")
+            sys.exit(1)
         VOLUME = args.symbols_by_volume
-        df = pd.read_parquet(daily_bars_path)
+        df = pd.read_parquet(args.daily_bars_path)
         aggregations = {
             "v": "min"
         }
@@ -242,5 +247,5 @@ if __name__ == "__main__":
         df.to_parquet(p, partition_cols=["date", "symbol"])
 
         if DELTA_TABLE:
-            spark_df = spark.createDataFrame(df)
+            spark_df = spark.createDataFrame(df) # pylint: disable=E0602
             spark_df.write.format("delta").mode("append").saveAsTable(DELTA_TABLE)
