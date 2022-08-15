@@ -187,7 +187,11 @@ if __name__ == "__main__":
     logging.info(ALPACA_START, ALPACA_END)
 
     config = configparser.ConfigParser()
-    config.read(CONFIG_FILE)
+    config_files = config.read(CONFIG_FILE)
+    print(config_files)
+    if not config_files:
+        logging.error("Can not find config file %s", CONFIG_FILE)
+        sys.exit(1)
 
     ENVIRONMENT = "local.downloader" if LOCAL else "databricks.downloader"
     daily_bars_path = config[ENVIRONMENT]["DailyBarsPath"]
