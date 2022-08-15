@@ -13,7 +13,6 @@ because we do not know the filepath
 when saving.
 """
 
-import argparse
 import configparser
 import datetime
 import os
@@ -62,7 +61,6 @@ if __name__ == "__main__":
         description="Alpaca bars downloader."
     )
 
-
     # Symbols
     parser.add_argument("--symbols", type=str, help="Symbols to download data for")
     parser.add_argument(
@@ -98,7 +96,14 @@ if __name__ == "__main__":
     )
 
     # Storage
-    parser.add_argument("--delta-table", type=str, dest="delta_table", help="Save dataframes to a delta table")
+    parser.add_argument(
+        "--delta-table",
+        type=str,
+        dest="delta_table", help="Save dataframes to a delta table")
+    parser.add_argument(
+        "--storage-path",
+        type=str,
+        dest="storage_path", help="Under which path data should be stored")
 
     args = parser.parse_args()
 
@@ -186,18 +191,9 @@ if __name__ == "__main__":
 
     logging.info(ALPACA_START, ALPACA_END)
 
-    config = configparser.ConfigParser()
-    config_files = config.read(CONFIG_FILE)
-    print(config_files)
-    if not config_files:
-        logging.error("Can not find config file %s", CONFIG_FILE)
-        sys.exit(1)
+    daily_bars_path = "/dbfs/mnt/datalake/landing/alpaca/snapshot/daily-bars"
 
-    ENVIRONMENT = "local.downloader" if LOCAL else "databricks.downloader"
-    daily_bars_path = config[ENVIRONMENT]["DailyBarsPath"]
-    storage_path = config[ENVIRONMENT]["StoragePath"]
-
-    STORAGE_DIR = Path(storage_path)
+    STORAGE_DIR = Path(args.storage_path)
 
     if args.symbols:
         symbols = args.symbols
