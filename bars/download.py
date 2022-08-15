@@ -38,7 +38,7 @@ try:
 except NameError:
     DB_CLUSTER_ID = None
     LOCAL = True
-    CONFIG_FILE = "/Workspace/Repos/finance/finance/bars/downloader.ini"
+    CONFIG_FILE = "/Repos/finance/finance/bars/downloader.ini"
 else:
     LOCAL = False
     CONFIG_FILE = "/dbfs/Users/david@argodis.de/github/demo/downloader.ini"
