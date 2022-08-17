@@ -185,7 +185,7 @@ if __name__ == "__main__":
             sys.exit(1)
         else:
             ALPACA_END = datetime.datetime.strptime(args.end_date, "%Y-%m-%d")
-    
+
     DELTA_TABLE = args.delta_table
 
     assert ALPACA_START
@@ -225,10 +225,6 @@ if __name__ == "__main__":
 
     for symbol in tqdm(symbols):
 
-        #
-        # TODO: Check for existing files
-        #
-
         try:
             df = api.get_bars(
                 symbol,
@@ -243,6 +239,7 @@ if __name__ == "__main__":
             continue
 
         if df.empty:
+            logging.warning("Skiping empty dataframe %s", symbol)
             continue
 
         df = df.reset_index()
