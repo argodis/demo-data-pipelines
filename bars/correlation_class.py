@@ -1,3 +1,7 @@
+# coding: utf-8
+"""
+Find and build eq classes of correlated stocks.
+"""
 
 import numpy as np
 import pandas as pd

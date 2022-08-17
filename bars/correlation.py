@@ -1,3 +1,7 @@
+# coding: utf-8
+"""
+Find correlations between stocks.
+"""
 
 import numpy as np
 import pandas as pd
