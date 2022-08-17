@@ -25,12 +25,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Linting with pylint
-        run: python -m pylint bars/download.py bars/quality_gaps.py
+        run: python -m pylint bars/*.py
 
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
   alpaca-quality:
     runs-on: ubuntu-latest
 
