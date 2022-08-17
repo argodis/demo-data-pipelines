@@ -97,6 +97,12 @@ if __name__ == "__main__":
         help="Force partial data download."
     )
 
+    parser.add_argument(
+        "--yesterday",
+        action="store_true",
+        help="Download data from yesterday (relative to users TZ)"
+    )
+
     # Storage
     parser.add_argument(
         "--delta-table",
@@ -119,6 +125,8 @@ if __name__ == "__main__":
     paper_api = REST(key_id=key_id, secret_key=secret_key, base_url=URL(PAPER_URL))
 
     today = datetime.datetime.now()
+    yesterday = today - datetime.timedelta(days=1)
+
     logging.warning("System is using timezone: %s", today.astimezone().tzname())
 
     timezone_est = pytz.timezone("EST")
@@ -151,6 +159,9 @@ if __name__ == "__main__":
         else:
             ALPACA_START = datetime.datetime.strptime(args.start_date, "%Y-%m-%d")
     else:
+        if args.yesterday:
+            today = yesterday
+
         calendar = paper_api.get_calendar(start=today, end=today)
         if not calendar:
             logging.error("No calendar data for %s", today)
@@ -171,16 +182,17 @@ if __name__ == "__main__":
         market_close_tz = market_close.astimezone(timezone_est)
         market_open_tz = market_open.astimezone(timezone_est)
 
-        if now < market_open_tz:
-            logging.warning("Market not open yet.")
-            if not args.force:
-                logging.error("Exiting.")
-                sys.exit(1)
-        elif now < market_close_tz:
-            logging.warning("Market is still open.")
-            if not args.force:
-                logging.error("Exiting.")
-                sys.exit(1)
+        if not args.yesterday:
+            if now < market_open_tz:
+                logging.warning("Market not open yet.")
+                if not args.force:
+                    logging.error("Exiting.")
+                    sys.exit(1)
+            elif now < market_close_tz:
+                logging.warning("Market is still open.")
+                if not args.force:
+                    logging.error("Exiting.")
+                    sys.exit(1)
 
         ALPACA_START = market_open_tz.astimezone(timezone_utc)
         ALPACA_END = market_close_tz.astimezone(timezone_utc)
@@ -206,7 +218,7 @@ if __name__ == "__main__":
     ALPACA_START = ALPACA_START.strftime("%Y-%m-%d")
     ALPACA_END = ALPACA_END.strftime("%Y-%m-%d")
 
-    logging.info(ALPACA_START, ALPACA_END)
+    logging.info("%s %s", ALPACA_START, ALPACA_END)
 
     STORAGE_DIR = Path(args.storage_path)
 
