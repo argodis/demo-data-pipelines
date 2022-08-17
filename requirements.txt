@@ -7,3 +7,4 @@ seaborn
 pylint
 tqdm
 uniplot
+networkx
