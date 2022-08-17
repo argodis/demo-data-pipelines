@@ -5,8 +5,6 @@ Find and build eq classes of correlated stocks.
 
 import numpy as np
 import pandas as pd
-import seaborn
-import matplotlib.pyplot as plt
 import networkx as nx
 
 
@@ -37,10 +35,9 @@ pairs = tri_df.index.values
 G = nx.Graph()
 for pair in pairs:
     G.add_edge(*pair)
-    
+
 C = list(nx.connected_components(G))
 
 for symbols in C:
     sub_df = df[df["symbol"].isin(symbols)]["open"]
     sub_df.plot()
-

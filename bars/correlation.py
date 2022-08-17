@@ -30,8 +30,6 @@ corr_df = pivot_df.corr()
 mask = np.zeros_like(corr_df)
 mask[np.triu_indices_from(mask)] = True
 seaborn.heatmap(corr_df, cmap='RdYlGn', vmax=1.0, vmin=-1.0 , mask = mask)
-plt.yticks(rotation=0) 
-plt.xticks(rotation=90) 
+plt.yticks(rotation=0)
+plt.xticks(rotation=90)
 plt.show()
-
-
