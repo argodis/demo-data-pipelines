@@ -70,7 +70,9 @@ if __name__ == "__main__":
 
     # Adjustments
     parser.add_argument("--adjustment-raw", action="store_true", help="Raw bar adjustment")
-    parser.add_argument("--adjustment-xxx", action="store_true", help="xxx bar adjustment")
+    parser.add_argument("--adjustment-split", action="store_true", help="Split bar adjustment")
+    parser.add_argument("--adjustment-divided", action="store_true", help="Divided bar adjustment")
+    parser.add_argument("--adjustment-all", action="store_true", help="All bar adjustment")
 
     # Time
     parser.add_argument(
@@ -218,12 +220,14 @@ if __name__ == "__main__":
 
     api = REST(key_id=key_id, secret_key=secret_key)
 
-    for symbol in tqdm(symbols):
-        p = STORAGE_DIR /f"{ALPACA_INTERVAL.amount}{ALPACA_INTERVAL.unit.name[0].lower()}"
-        p.mkdir(parents=True, exist_ok=True)
+    p = STORAGE_DIR /f"{ALPACA_INTERVAL.amount}{ALPACA_INTERVAL.unit.name[0].lower()}"
+    p.mkdir(parents=True, exist_ok=True)
 
-        if Path(p).is_file():
-            continue
+    for symbol in tqdm(symbols):
+
+        #
+        # TODO: Check for existing files
+        #
 
         try:
             df = api.get_bars(
