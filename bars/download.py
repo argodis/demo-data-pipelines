@@ -48,6 +48,8 @@ TODAY = datetime.datetime.now().strftime("%Y-%m-%d")
 
 if __name__ == "__main__":
 
+    logging.basicConfig(level=logging.INFO)
+
     if DB_CLUSTER_ID:
         key_id = dbutils.secrets.get("dbc", "alpaca-key-id-unlimited") # pylint: disable=E0602
         secret_key = dbutils.secrets.get("dbc", "alpaca-key-secret-unlimited") # pylint: disable=E0602
@@ -102,7 +104,7 @@ if __name__ == "__main__":
         dest="delta_table", help="Save dataframes to a delta table")
     parser.add_argument(
         "--storage-path",
-        type=str,
+        type=str, required=True,
         dest="storage_path", help="Under which path data should be stored")
 
     # Daily bars
@@ -132,6 +134,13 @@ if __name__ == "__main__":
 
     if args.minute_bars:
         ALPACA_INTERVAL = TimeFrame(1, TimeFrameUnit.Minute)
+
+    if args.adjustment_split:
+        ALPACA_ADJUSTMENT = "split"
+    elif args.adjustment_divided:
+        ALPACA_ADJUSTMENT = "divided"
+    elif args.adjustment_all:
+        ALPACA_ADJUSTMENT = "all"
 
     if args.start_date:
         try:
@@ -163,12 +172,14 @@ if __name__ == "__main__":
         market_open_tz = market_open.astimezone(timezone_est)
 
         if now < market_open_tz:
-            logging.warning("Market not open yet. Exiting")
+            logging.warning("Market not open yet.")
             if not args.force:
+                logging.error("Exiting.")
                 sys.exit(1)
         elif now < market_close_tz:
-            logging.warning("Market is still open. Exiting")
+            logging.warning("Market is still open.")
             if not args.force:
+                logging.error("Exiting.")
                 sys.exit(1)
 
         ALPACA_START = market_open_tz.astimezone(timezone_utc)
