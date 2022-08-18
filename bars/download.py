@@ -212,9 +212,13 @@ if __name__ == "__main__":
 
     DELTA_TABLE = args.delta_table
 
-    assert ALPACA_START
-    assert ALPACA_END
-    assert ALPACA_INTERVAL
+    try:
+        assert ALPACA_START, "ALPACA_START not defined"
+        assert ALPACA_END, "ALPACA_END not defined"
+        assert ALPACA_INTERVAL, "ALPACA_INTERVAL not defined"
+    except AssertionError as msg:
+        logging.error(msg)
+        sys.exit(1)
 
     ALPACA_START = ALPACA_START.strftime("%Y-%m-%d")
     ALPACA_END = ALPACA_END.strftime("%Y-%m-%d")
@@ -272,5 +276,9 @@ if __name__ == "__main__":
         df.to_parquet(p, partition_cols=["date", "symbol"])
 
         if DELTA_TABLE:
-            spark_df = spark.createDataFrame(df) # pylint: disable=E0602
-            spark_df.write.format("delta").mode("append").saveAsTable(DELTA_TABLE)
+            try:
+                spark_df = spark.createDataFrame(df) # pylint: disable=E0602
+                spark_df.write.format("delta").mode("append").saveAsTable(DELTA_TABLE)
+            except NameError:
+                logging.warning("Can not write to delta table %s", DELTA_TABLE)
+                continue
