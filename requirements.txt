@@ -8,3 +8,4 @@ pylint
 tqdm
 uniplot
 networkx
+pyflakes
