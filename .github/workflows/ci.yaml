@@ -27,7 +27,7 @@ jobs:
       - name: Linting with pylint
         run: python -m pylint bars/*.py
 
-  lint-pyflakes:
+  lint-bandit:
     runs-on: ubuntu-latest
 
     steps:
@@ -45,7 +45,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Linting with pylint
-        run: python -m pyflakes bars/*.py
+        run: python -m bandit -r bars
 
   alpaca-quality:
     runs-on: ubuntu-latest

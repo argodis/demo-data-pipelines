@@ -8,4 +8,4 @@ pylint
 tqdm
 uniplot
 networkx
-pyflakes
+bandit
